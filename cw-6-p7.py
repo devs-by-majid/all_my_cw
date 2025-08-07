@@ -1,15 +1,24 @@
 
-# @time(3)
-# ​def limit(calls=3):
-#     def decorator(func):
+def limit_time(maxcalls):
 
-#         def wrapper(*args, **kwargs):
+    count = 0
 
-#         return wrapper
-#     return decorator
+    def decorator(func):
+
+        def wrapper(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count < maxcalls:
+                result = func(*args, **kwargs)
+                return result
+            else:
+                return ("you exceed the limit")
+
+        return wrapper
+    return decorator
 
 
-def execution_limit(func):
+def execution_limit1(func):
     count = 0
 
     def wrapper(*args, **kwargs):
@@ -24,7 +33,11 @@ def execution_limit(func):
     return wrapper
 
 
-@execution_limit
+# @execution_limit1
+# def print_string(string):
+#     return (string)
+
+@limit_time(3)
 def print_string(string):
     return (string)
 
