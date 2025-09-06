@@ -2,82 +2,119 @@ import requests
 import csv
 import json
 import os
-from custom_exceptions import FileISEmptyError
+from custom_exceptions import FileISEmptyError, FileFormatError
 import argparse
 
-try:
-    
 
-    file_path = "user_posts.json"
-    resp = requests.get("https://jsonplaceholder.typicode.com/posts")
-    print(resp.status_code)
+def get_post(postid=None, format="json"):
+    try:
+        url = (
+            f"https://jsonplaceholder.typicode.com/posts/{args.user}"
+            if postid
+            else "https://jsonplaceholder.typicode.com/posts"
+        )
 
-    if resp.status_code == 200:
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            resp.raise_for_status()
+
+        file_name = f"fetch_post.{format}"
         resp = resp.json()
 
-        posts = [
-            {"userId": post["userId"], "id": post["id"], "title": post["title"][0:40]}
-            for post in resp
-        ]
+        data = (
+            [
+                {
+                    "userId": post["userId"],
+                    "id": post["id"],
+                    "title": post["title"][0:40],
+                }
+                for post in resp
+            ]
+            if isinstance(resp, list)
+            else {
+                "userId": resp["userId"],
+                "id": resp["id"],
+                "title": resp["title"][0:40],
+            }
+        )
 
-        # with open(file_path, "wt") as file:
-        #         json.dump(resp, file)
+        if format == "json":
 
-        with open("output.csv", "w", newline="", encoding="utf-8") as file:
+            with open(file_name, "wt") as file:
+                json.dump(data, file)
 
-            writer = csv.DictWriter(
-                file, fieldnames=["userId", "id", "title"]
-            )  # filedsname are column header inside excel
-            writer.writeheader()
-            writer.writerows(post for post in posts)
+            file_size = os.path.getsize(file_name)
+            if file_size == 0:
+                raise FileISEmptyError("file is empty")
 
-        file_size = os.path.getsize("output.csv")
-        if file_size == 0:
-            raise FileISEmptyError("file is empty")
+            else:
+                with open(file_name, "r") as file:
+                    posts = json.load(file)
 
-        print("file is contain data")
-        with open(file_path, "r") as file:
-            posts = json.load(file)
+                return posts
 
+        if format == "csv":
+            # filedsname are column header inside excel
+            with open(file_name, "w", newline="", encoding="utf-8") as file:
+
+                writer = csv.DictWriter(file, fieldnames=["userId", "id", "title"])
+                writer.writeheader()
+                if isinstance(data, list):
+
+                    writer.writerows(data)
+                else:
+                    writer.writerow(data)
+
+            file_size = os.path.getsize(file_name)
+            if file_size == 0:
+                raise FileISEmptyError("file is empty")
+
+            return
+
+    except FileFormatError as e:
+        print(e)
+
+    except FileISEmptyError as e:
+        print(e)
+
+    except FileNotFoundError as e:
+        print(e)
+
+    except requests.exceptions.HTTPError as httpErr:
+        print(httpErr.args[0])
+    except requests.ConnectionError as e:
+        print(e)
+    except requests.ConnectTimeout as e:
+        print(e)
+    except requests.exceptions.InvalidJSONError as e:
+        print(e)
+
+
+try:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--user", type=int)
+    parser.add_argument("-f", "--format", default="json")
+
+    args = parser.parse_args()
+
+    if args.user:
+        if args.format and args.format == "json":
+            get_post(args.user)
+
+        elif args.format and args.format == "csv":
+            get_post(args.user, "csv")
+
+        else:
+            raise FileFormatError("file format is not excepted")
     else:
-        raise resp.raise_for_status()
+        if args.format and args.format == "json":
+            get_post()
 
-except FileISEmptyError as e:
+        elif args.format and args.format == "csv":
+            get_post(None, "csv")
+
+        else:
+            raise FileFormatError("file format is not excepted")
+
+except FileFormatError as e:
     print(e)
-
-except FileNotFoundError as e:
-    print(e)
-
-except requests.exceptions.HTTPError as httpErr:
-    print(httpErr.args[0])
-except requests.ConnectionError as e:
-    print(e)
-except requests.ConnectTimeout as e:
-    print(e)
-except requests.exceptions.InvalidJSONError as e:
-    print(e)
-
-
-
-
-
-# two way of validating file empty or not
-# 2-  file_size=os.stat(file_path).st_size
-# file is empty  if file_size ==0 else file is not empty
-
-
-# file_path = "input1.txt"
-# 3
-# open the file in read mode
-# with open(file_path, 'r') as file_obj:
-# move the file pointer from 0th position to end position
-# file_obj.seek(0, os.SEEK_END)
-
-# return the current position of file pointer
-# file_size = file_obj.tell()
-
-# if file size is 0, it is empty
-# if file_size == 0:
-# print("File is empty")
-# else:
-# print("File is NOT empty")
